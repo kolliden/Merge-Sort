@@ -15,10 +15,12 @@ let condition = true;
 let allInOrder = true;
 
 let AM_width = 1;
-let arr = []
+let arr = [];
+let index = 0;
+let animationBuffer = [];
 
 let ticks = 0;
-let speed = 15;
+let speed = 5;
 
 const arrSize = 900;
 const ACTIONS = { /* An object that contains the actions that the algorithm does. */
@@ -57,7 +59,7 @@ const playSound = async (type, rate) => {    //https://stackoverflow.com/questio
 
 
   gainNode.gain.value = 1;
-  oscillator.frequency.value = rate*8.5;
+  oscillator.frequency.value = rate;
   oscillator.type = type;
 
   oscillator.start();
@@ -119,6 +121,9 @@ function shuffle(array) {
   return array;
 }
 
+function determineHeight(v){
+  return (v * -1 * canvas.height/arrSize)
+}
 /**
  * It creates a rectangle with a value, a color, and a few methods to manipulate it
  * @param x - x-coordinate of the rectangle
@@ -189,9 +194,12 @@ const actionsMap = {
     members[i].setColor("pink");
   },
   [ACTIONS.INSERT]: (action, members) => {
-    const [i , j] = action.data;
-    members[i].setValue(j * canvas.height/100 * -1, "black");
-    playSound('sawtooth', members[i].getValue());
+    const [i , v] = action.data;
+    members[i].setValue(determineHeight(v), "pink");
+    playSound('sine', members[i].getValue());
+    playSound('sine', members[i].getValue()*2);
+    playSound('sine', members[i].getValue()*1.8);
+    playSound('sine', members[i].getValue()*1.5);
   },
   [ACTIONS.SHIFT_RIGHT]: (action, members) => {
     const i = action.data;
@@ -230,6 +238,57 @@ async function swap(arr, leftIndex, rightIndex){
     arr[rightIndex] = temp;
 }
 
+const CopyArray = (A, iBegin, iEnd, B) => {
+  for (let k = iBegin; k < iEnd; k++){
+      B[k] = A[k];
+  }
+}
+
+function merge(left, right, step) {
+  let arr = [];
+  // Break out of loop if any one of the array gets empty
+  while (left.length && right.length) {
+      // Pick the smaller among the smallest element of left and right sub arrays
+      if (left[0] < right[0]) {
+          arr.push(left.shift());
+      } else {
+          arr.push(right.shift());
+      }
+  }
+  // Concatenating the leftover elements
+  // (in case we didn't go through the entire left or right array)
+  let endArr = [ ...arr, ...left, ...right ];
+
+  //Animate
+  if(!(step in animationBuffer)){
+    for(let i = 0; i <= step; i++){
+      animationBuffer.push([]);
+    }
+  }
+
+  for (let i = 0; i < endArr.length; i++) {
+    animationBuffer[step].push(endArr[i]);
+  }
+
+  return endArr;
+}
+
+function mergeSort(array, step) {
+  const half = array.length / 2;
+
+  // Base case or terminating case
+  if(array.length < 2){
+    return array;
+  }
+
+  //Recursion
+  const left = array.splice(0, half);
+
+  let arrayL = mergeSort(left, step + 1);
+  let arrayR = mergeSort(array, step + 1);
+
+  return merge(arrayL,arrayR, step);
+}
 
 const start = () => {
   initCanvas();
@@ -238,19 +297,29 @@ const start = () => {
 
   arr = initRandomArr(arr);
   arrayMembers = arr.map((v, i) => {
-    return new ArrayMember((AM_width * i + i), canvas.height, AM_width, v * -1 * canvas.height/arrSize);
+    return new ArrayMember((AM_width * i + i), canvas.height, AM_width, determineHeight(v));
   });
 
   drawAll();
 
   var startTime = performance.now()
 
- // first call to quick sort
-  var sortedArray = quickSort(arr, 0, arr.length - 1);
+  console.log(arr);
 
-  speed = 5;
-  check(sortedArray);
-  console.log(sortedArray); //prints [2,3,5,6,7,9]
+  arr = mergeSort(arr, 0);
+
+
+  for(let j = animationBuffer.length - 1; j > 0; j--){
+    for(let i = 0; i < animationBuffer[j].length; i++){
+      onAction({type: ACTIONS.INSERT, data: [i, animationBuffer[j][i]]});
+    }
+  }
+  for(let i = 0; i < arr.length; i++){
+    onAction({type: ACTIONS.INSERT, data: [i, arr[i]]});
+  }
+
+  // speed = 5;
+  // check(arr);
 
   var endTime = performance.now()
 
